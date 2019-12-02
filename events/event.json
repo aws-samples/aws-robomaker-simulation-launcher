@@ -1,0 +1,51 @@
+{
+    "wait": 5,
+    "scenarios": {
+        "BasicSlowTest": {
+            "robotEnvironmentVariables": {
+                "TIME_TEST_LENGTH_IN_SECONDS": "60",
+                "SPEED_IN_RADIANS_PER_SECOND": "0.2"
+            },
+            "simEnvironmentVariables": {}
+        },
+        "LongFastTest": {
+            "robotEnvironmentVariables": {
+                "TIME_TEST_LENGTH_IN_SECONDS": "120",
+                "SPEED_IN_RADIANS_PER_SECOND": "0.5"
+            },
+            "simEnvironmentVariables": {}
+        }
+    },
+    "simulations": [{
+        "scenarios": ["BasicSlowTest","LongFastTest"],
+        "params": {
+               "failureBehavior": "Fail",
+               "iamRole": "string",
+               "maxJobDurationInSeconds": 600,
+               "outputLocation": { 
+                  "s3Bucket": "<YOUR_S3_BUCKET>",
+                  "s3Prefix": "logs"
+               },
+               "robotApplications": [ 
+                  { 
+                     "application": "<YOUR_ROBOT_APPLICATION_ARN>",
+                     "applicationVersion": "1",
+                     "launchConfig": { 
+                        "launchFile": "rotate.launch",
+                        "packageName": "hello_world_robot"
+                     }
+                  }
+               ],
+               "simulationApplications": [ 
+                  { 
+                     "application": "<YOUR_SIMULATION_APPLICATION_ARN>",
+                     "applicationVersion": "1",
+                     "launchConfig": { 
+                        "launchFile": "empty_world.launch",
+                        "packageName": "hello_world_simulation"
+                     }
+                  }
+               ]
+        }
+    }]
+}

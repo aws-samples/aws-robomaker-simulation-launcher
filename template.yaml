@@ -1,0 +1,46 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+Description: A python3 lambda functions that invokes scenario-based batch simulations.
+Resources:
+  batchsimulations:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      Handler: app.lambda_handler
+      Runtime: python3.7
+      CodeUri: batch_simulations/
+      Description: A python3 lambda functions that invokes scenario-based batch simulations.
+      MemorySize: 128
+      Timeout: 120
+      Policies:
+        - CloudWatchPutMetricPolicy: {}
+        - Statement:
+          - Sid: RoboMakerSimulationPolicy
+            Effect: Allow
+            Action:
+              - robomaker:CreateSimulationJob
+            Resource: '*'
+        - Statement:
+          - Sid: IAMPassRole
+            Effect: Allow
+            Action:
+              - iam:PassRole
+            Resource: !GetAtt RoboMakerSimulationRole.Arn
+  # IMPORTANT: Lock this down to your specific resources. 
+  RoboMakerSimulationRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+    RoleName: !Sub robomaker-simulation-role-${AWS::Region}
+    AssumeRolePolicyDocument:
+      Version: 2012-10-17
+      Statement:
+        -
+          Effect: Allow
+          Principal:
+          Service:
+            - robomaker.amazonaws.com
+          Action:
+            - sts:AssumeRole
+    ManagedPolicyArns:
+      - 'arn:aws:iam::aws:policy/CloudWatchFullAccess'
+      - 'arn:aws:iam::aws:policy/AWSRoboMakerFullAccess'
+      - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
