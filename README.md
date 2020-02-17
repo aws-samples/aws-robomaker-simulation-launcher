@@ -1,11 +1,23 @@
-# Batch Simulations with Custom Scenarios
-### Version 0.0.1
+# Launching Batch Simulations in AWS RoboMaker with Code Pipeline and Step Functions
+### Version 0.0.2
 
-This function will create a set of AWS RoboMaker simulation jobs based on scenario criteria defined.
+This serverless back end application will launch a batch set of simulations based on scenarios defined as groups of environment variable key-value pairs.
 
-- batch_simulations - Main python script that will run the simulations.
-- events - A sample set of scenarios, and an example of the JSON structure to use with the Lambda function.
-- template.yaml - The template that creates the resources you would need.
+![CICD Pipeline](images/cicd_pipeline.png)
+
+The application consists of:
+- Step Functions State Machine 
+- AWS RoboMaker Supporting Resources (Robot, Simulation Application, S3 Bucket, VPC and IAM roles)
+- Set of Lambda functions:
+  - **triggerStepFunctions**: The lambda function that kicks off the AWS Step Functions state machine from AWS CodePipeline.
+  - **processAndLaunchBatchSimulations**: Process the RoboMaker Simulation Scenarios Document and start the batch of simulation jobs. 
+  - **checkStatus**: This lambda function runs in a loop, describes the current simulation job and checks the status. Once complete, it sends a set of ARNs to the summary function.
+  - **sendSimSummary**: The lambda function that takes an input of ARNs and performs a batch describe simulation job request. It then processes the results looking for failures.
+  - **errorLaunchingSimulations**: The error lambda function that captures any failures and fails the CodePipeline job.
+- RoboMaker Simulation Scenarios Template Document (JSON,scenarios_template.json)
+- template.yaml - The template that creates all of the above resources.
+
+![State Machine](images/stepfunctions_workflow.png)
 
 ## Event Structure
 
@@ -13,7 +25,7 @@ Here is the event structure (what to send to the lambda function when you invoke
 
 ```json
     {
-        "wait": "5",
+        "codePipelineJobID": "<THE ID FROM CODEPIPELINE>",
         "scenarios": {
             "": {
                 "robotEnvironmentVariables": {},
@@ -96,81 +108,26 @@ To use the SAM CLI, you need the following tools.
 * [Python 3 installed](https://www.python.org/downloads/)
 * Docker - [Install Docker community edition](https://hub.docker.com/search/?type=edition&offering=community)
 
-The SAM CLI uses an Amazon S3 bucket to store your application's deployment artifacts. If you don't have a bucket suitable for this purpose, create one. Replace `BUCKET_NAME` in the commands in this section with a unique bucket name.
+The SAM CLI uses an Amazon S3 bucket to store your application's deployment artifacts. If you don't have a bucket suitable for this purpose, create one. Replace `YOUR_BUCKET` in the commands in this section with a unique bucket name.
+
+Once ready, run the following commands to build, package and deploy this SAM application.
 
 ```bash
-batch-simulations-scenarios$ aws s3 mb s3://BUCKET_NAME
-```
-
-To prepare the application for deployment, use the `sam build` and `sam package` command.
-
-```bash
-batch-simulations-scenarios$ sam build
-batch-simulations-scenarios$ sam package \
-    --output-template-file packaged.yaml \
-    --s3-bucket BUCKET_NAME
-```
-
-The SAM CLI creates deployment packages, uploads them to the S3 bucket, and creates a new version of the template that refers to the artifacts in the bucket. 
-
-To deploy the application, use the `sam deploy` command.
-
-```bash
-batch-simulations-scenarios$ sam deploy \
-    --template-file packaged.yaml \
-    --stack-name batch-simulations-scenarios \
-    --capabilities CAPABILITY_IAM
-```
-
-After deployment is complete you can run the following command to retrieve the API Gateway Endpoint URL:
-
-```bash
-batch-simulations-scenarios$ aws cloudformation describe-stacks \
-    --stack-name batch-simulations-scenarios \
-    --query 'Stacks[].Outputs[?OutputKey==`HelloWorldApi`]' \
-    --output table
-``` 
-
-## Use the SAM CLI to build and test locally
-
-Build your application with the `sam build` command.
-
-```bash
-batch-simulations-scenarios$ sam build
-```
-
-The SAM CLI installs dependencies defined in `batch_simulations/requirements.txt`, creates a deployment package, and saves it in the `.aws-sam/build` folder.
-
-Test a single function by invoking it directly with a test event. An event is a JSON document that represents the input that the function receives from the event source. Test events are included in the `events` folder in this project.
-
-Run functions locally and invoke them with the `sam local invoke` command.
-
-```bash
-batch-simulations-scenarios$ sam local invoke batchsimulations --event events/event.json
+sam build --use-container -m ./requirements.txt
+sam package --output-template-file package.yml --s3-bucket <YOUR_BUCKET>
+sam deploy --template-file package.yml --stack-name cicd_stack --capabilities CAPABILITY_NAMED_IAM --s3-bucket <YOUR_BUCKET>
 ```
 
 ## Add a resource to your application
 The application template uses AWS Serverless Application Model (AWS SAM) to define application resources. AWS SAM is an extension of AWS CloudFormation with a simpler syntax for configuring common serverless application resources such as functions, triggers, and APIs. For resources not included in [the SAM specification](https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md), you can use standard [AWS CloudFormation](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-template-resource-type-ref.html) resource types.
-
-## Fetch, tail, and filter Lambda function logs
-
-To simplify troubleshooting, SAM CLI has a command called `sam logs`. `sam logs` lets you fetch logs generated by your deployed Lambda function from the command line. In addition to printing the logs on the terminal, this command has several nifty features to help you quickly find the bug.
-
-`NOTE`: This command works for all AWS Lambda functions; not just the ones you deploy using SAM.
-
-```bash
-batch-simulations-scenarios$ sam logs -n HelloWorldFunction --stack-name batch-simulations-scenarios --tail
-```
-
-You can find more information and examples about filtering Lambda function logs in the [SAM CLI Documentation](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-logging.html).
 
 ## Cleanup
 
 To delete the sample application and the bucket that you created, use the AWS CLI.
 
 ```bash
-batch-simulations-scenarios$ aws cloudformation delete-stack --stack-name batch-simulations-scenarios
-batch-simulations-scenarios$ aws s3 rb s3://BUCKET_NAME
+aws cloudformation delete-stack --stack-name cicd_stack
+aws s3 rb s3://BUCKET_NAME
 ```
 ## Resources
 
