@@ -18,4 +18,4 @@ def lambda_handler(event, context):
             'message': event['error']['Cause']
     })
         
-    return 'Simulations failed.'
+    return json.dumps(event['error'])
