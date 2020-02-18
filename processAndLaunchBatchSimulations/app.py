@@ -29,7 +29,6 @@ def lambda_handler(event, context):
 
         Output Event:
         { 
-            isValid: Boolean | The input JSON structure is valid.
             isDone: Boolean | If the batch simulation describe call returns complete.
             batchSimJobArn: String | The ARN of the simulation batch.
             status: String | InProgress, Success or Failed for downstream processing.
@@ -38,7 +37,6 @@ def lambda_handler(event, context):
     '''
 
     output = {
-        'isValid': True,
         'isDone': False,
         'codePipelineJobId': event['codePipelineJobId'],
         'batchSimJobArn': None
@@ -92,10 +90,7 @@ def lambda_handler(event, context):
                 jobs.append(_sim_params)
                 
             else:
-                output['isValid'] = False
-                output['error'] = {
-                    'Cause': 'Scenario not defined.'
-                }
+                raise Exception('Scenario %s does not exist.' % scenario)
                 
         response = client.start_simulation_job_batch(
             batchPolicy={
@@ -107,7 +102,10 @@ def lambda_handler(event, context):
                 'launcher': 'cicd_pipeline',
                 'codePipelineJobId': event['codePipelineJobId']
         })
-        
+
         output['batchSimJobArn'] = response['arn']
+        
+        if not output['batchSimJobArn']:
+            raise Exception('Error launching batch simulation jobs. Check your scenarios JSON document.')
         
     return output
