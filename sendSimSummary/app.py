@@ -6,7 +6,7 @@ pipeline = boto3.client('codepipeline')
 client = boto3.client('robomaker')
 
 def lambda_handler(event, context):
-        '''
+    '''
         This lambda function will describe a batch of simulation jobs and look for failed tests.
         It will then return the simulation job results to CodePipeline.
 
@@ -26,6 +26,7 @@ def lambda_handler(event, context):
             codePipelineJobId: String | The ID of the active CodePipeline job.
         }
     '''
+
     output = {
         'message': 'No results.',
         'codePipelineJobId': event['codePipelineJobId'],
