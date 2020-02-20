@@ -1,0 +1,56 @@
+{
+	"scenarios": {
+	    "Scenario1": {
+	      "robotEnvironmentVariables": {
+	        "EXAMPLE_ENV_VARIABLE": "VALUE"
+	      },
+	      "simEnvironmentVariables": {
+	        "EXAMPLE_ENV_VARIABLE": "VALUE"
+	      }
+	    },
+	    "Scenario2": {
+	      "robotEnvironmentVariables": {
+	        "EXAMPLE_ENV_VARIABLE": "VALUE"
+	      },
+	      "simEnvironmentVariables": {
+	        "EXAMPLE_ENV_VARIABLE": "VALUE"
+	      }
+	    }
+	},
+	"simulations": [{
+		"scenarios": [
+			"Scenario1",
+	        "Scenario2"
+	      ],
+		"params": {
+			"failureBehavior": "Fail",
+			"iamRole": "<IAM_ROLE_FOR_ROBOMAKER_SIMULATION>",
+			"maxJobDurationInSeconds": 600,
+			"outputLocation": {
+				"s3Bucket": "<S3_BUCKET_FOR_LOGS>",
+				"s3Prefix": "<S3_PREFIX_FOR_LOGS>"
+			},
+			"robotApplications": [{
+				"application": "<ROBOMAKER_ROBOT_APPLICATION_ARN>",
+				"applicationVersion": "$LATEST",
+				"launchConfig": {
+					"launchFile": "<LAUNCH_FILE>",
+					"packageName": "<PACKAGE_NAME>"
+				}
+			}],
+			"simulationApplications": [{
+				"application": "<ROBOMAKER_SIMULATION_APPLICATION_ARN>",
+				"applicationVersion": "$LATEST",
+				"launchConfig": {
+					"launchFile": "<LAUNCH_FILE>",
+					"packageName": "<PACKAGE_NAME>"
+				}
+			}],
+			"vpcConfig": {
+				"assignPublicIp": true,
+				"subnets": [ "<SUBNET_ID_1>", "<SUBNET_ID_2>" ],
+            	"securityGroups": [ "<SECURITY_GROUP_ID>" ]
+			}
+		}
+	}]
+}

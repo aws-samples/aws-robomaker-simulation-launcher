@@ -1,0 +1,420 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: "ROS CICD Pipeline"
+Globals:
+  Function:
+    Timeout: 3
+Parameters:
+    VpcCIDR: 
+        Description: Please enter the IP range (CIDR notation) for this VPC
+        Type: String
+        Default: 10.168.0.0/16
+    PublicSubnet1CIDR:
+        Description: Please enter the IP range (CIDR notation) for the public subnet in the first Availability Zone
+        Type: String
+        Default: 10.168.10.0/24
+    PublicSubnet2CIDR:
+        Description: Please enter the IP range (CIDR notation) for the public subnet in the second Availability Zone
+        Type: String
+        Default: 10.168.11.0/24
+    ScenarioDefinitionDocument:
+        Description: Please enter the filename for the scenario definition document used to define scenarios to launch.
+        Type: String
+        Default: "scenarios.json"
+Resources:
+  RobotApplication:
+    Type: "AWS::RoboMaker::RobotApplication"
+    Properties:
+      Sources:
+        - S3Bucket: !Ref S3Bucket
+          S3Key: "bundles/x86/robotApp.tar"
+          Architecture: "X86_64"
+      RobotSoftwareSuite:
+        Name: "ROS"
+        Version: "Kinetic"
+      Tags:
+        "Name" : "RobotApplication"
+        "Type" : "CICD_Auto_Generate"
+  SimulationApplication:
+    Type: "AWS::RoboMaker::SimulationApplication"
+    Properties:
+      Sources:
+        - S3Bucket: !Ref S3Bucket
+          S3Key: "bundles/x86/simulationApp.tar"
+          Architecture: "X86_64"
+      RobotSoftwareSuite:
+        Name: "ROS"
+        Version: "Kinetic"
+      SimulationSoftwareSuite:
+        Name: "Gazebo"
+        Version: "7"
+      RenderingEngine:
+        Name: "OGRE"
+        Version: "1.x"
+      Tags:
+        "Name" : "SimulationApplication"
+        "Type" : "CICD_Auto_Generate"
+  VPC: 
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      Tags: 
+        - Key: Name 
+          Value: !Ref AWS::StackName
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Ref AWS::StackName
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+  PublicSubnet1: 
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Ref PublicSubnet1CIDR
+      MapPublicIpOnLaunch: true
+      Tags: 
+        - Key: Name 
+          Value: !Sub ${AWS::StackName} ${AWS::Region} Public Subnet (AZ1)
+  PublicSubnet2: 
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: !Ref PublicSubnet2CIDR
+      MapPublicIpOnLaunch: true
+      Tags: 
+        - Key: Name 
+          Value: !Sub ${AWS::StackName} ${AWS::Region} Public Subnet (AZ2)
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId: !Ref VPC
+      Tags: 
+        - Key: Name 
+          Value: !Sub ${AWS::StackName} ${AWS::Region} Public Routes
+  RoboMakerSimulationRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Sub robomaker-simulation-role-batch-${AWS::Region}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - robomaker.amazonaws.com
+            Action:
+            - sts:AssumeRole
+      Policies:
+      - PolicyName: RoboMakerSimRole
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:      
+            - Effect: Allow
+              Action: s3:ListBucket
+              Resource:
+              - Fn::Join:
+                - /
+                - - Fn::GetAtt:
+                    - S3Bucket
+                    - Arn
+                  - '*'
+            - Effect: Allow
+              Action:
+                - s3:Get*
+                - s3:List*
+              Resource:
+                - Fn::Join:
+                  - /
+                  - - Fn::GetAtt:
+                      - S3Bucket
+                      - Arn
+                    - '*'
+            - Effect: Allow
+              Action: s3:Put*
+              Resource:
+                - Fn::GetAtt:
+                  - S3Bucket
+                  - Arn
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+                - logs:DescribeLogStreams
+              Resource:
+                - '*'
+            - Effect: Allow
+              Action:
+                - ec2:CreateNetworkInterfacePermission
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - ec2:AssociateRouteTable
+                - ec2:CreateSubnet
+                - ec2:DeleteNetworkInterface
+                - ec2:DeleteSubnet
+                - ec2:DescribeNetworkInterfaces
+                - ec2:DescribeSecurityGroups
+                - ec2:DescribeSubnets
+                - ec2:DescribeVpcs
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:DescribeLogStreams
+                - logs:PutLogEvents
+              Resource:
+                - '*'
+            - Effect: Allow
+              Action:
+                - cloudwatch:PutMetricData
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - robomaker:TagResource
+                - robomaker:CancelSimulationJob
+              Resource: '*'
+  StepFunctionsLambda:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+                - states.amazonaws.com
+            Action:
+            - sts:AssumeRole
+      Policies:
+      - PolicyName: StepFunctionsLambdaPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:  
+            - Effect: Allow
+              Action:
+                - lambda:InvokeFunction
+                - codepipeline:PollForJobs
+                - s3:GetAccessPoint
+                - s3:GetObject
+                - cloudwatch:PutMetricData
+                - robomaker:DescribeSimulationJobBatch
+                - robomaker:BatchDescribeSimulationJob
+                - robomaker:DescribeRobotApplication
+                - robomaker:CreateSimulationJob
+                - codepipeline:PutThirdPartyJobFailureResult
+                - logs:CreateLogStream
+                - codepipeline:PutJobFailureResult
+                - s3:HeadBucket
+                - codepipeline:PutThirdPartyJobSuccessResult
+                - s3:PutAccountPublicAccessBlock
+                - s3:ListAccessPoints
+                - codepipeline:PutJobSuccessResult
+                - robomaker:DescribeSimulationApplication
+                - s3:ListJobs
+                - logs:CreateLogGroup
+                - logs:PutLogEvents
+                - robomaker:StartSimulationJobBatch
+                - robomaker:DescribeSimulationJob
+                - robomaker:ListSimulationJobBatches
+                - s3:GetAccountPublicAccessBlock
+                - codepipeline:PutApprovalResult
+                - s3:ListAllMyBuckets
+                - s3:CreateJob
+              Resource: '*'
+            - Effect: Allow
+              Action: 
+              - iam:PassRole
+              - iam:AddRoleToInstanceProfile
+              Resource: !GetAtt RoboMakerSimulationRole.Arn
+            - Effect: Allow
+              Action: states:StartExecution
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - s3:*
+              Resource:
+                - Fn::GetAtt: S3Bucket.Arn
+      RoleName: !Sub step-functions-batch-role-${AWS::Region}
+  RoboMakerDeploymentRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Sub robomaker-deployment-role-batch-${AWS::Region}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+                - iot.amazonaws.com
+                - greengrass.amazonaws.com
+            Action:
+            - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSGreengrassResourceAccessRolePolicy'
+  DefaultPublicRoute: 
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties: 
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet2
+  S3Bucket:
+    Type: AWS::S3::Bucket
+  ProcessAndLaunchBatchSimulationsFunction:
+    Type: AWS::Serverless::Function 
+    Properties:
+      CodeUri: processAndLaunchBatchSimulations/
+      Handler: app.lambda_handler
+      Runtime: python3.8
+      Role: !GetAtt StepFunctionsLambda.Arn
+      Tracing: Active
+      Environment:
+        Variables:
+          S3_BUCKET: !Ref S3Bucket
+          ROBOT_APP_ARN: !Ref RobotApplication
+          SIMULATION_APP_ARN: !Ref SimulationApplication
+          IAM_ROLE: !GetAtt RoboMakerSimulationRole.Arn
+          SUBNET_1: !Ref PublicSubnet1
+          SUBNET_2: !Ref PublicSubnet2
+          SECURITY_GROUP: !GetAtt VPC.DefaultSecurityGroup
+  CheckStatusFunction:
+    Type: AWS::Serverless::Function 
+    Properties:
+      CodeUri: checkStatus/
+      Handler: app.lambda_handler
+      Runtime: python3.8
+      Tracing: Active
+      Role: !GetAtt StepFunctionsLambda.Arn
+  SendSimSummaryFunction:
+    Type: AWS::Serverless::Function 
+    Properties:
+      CodeUri: sendSimSummary/
+      Handler: app.lambda_handler
+      Runtime: python3.8
+      Tracing: Active
+      Role: !GetAtt StepFunctionsLambda.Arn
+  ErrorLaunchingSimulationsFunction:
+    Type: AWS::Serverless::Function 
+    Properties:
+      CodeUri: errorLaunchingSimulations/
+      Handler: app.lambda_handler
+      Runtime: python3.8
+      Tracing: Active
+      Role: !GetAtt StepFunctionsLambda.Arn
+  TriggerStepFunctions:
+    Type: AWS::Serverless::Function 
+    Properties:
+      CodeUri: triggerStepFunctions/
+      Handler: app.lambda_handler
+      Runtime: python3.8
+      Role: !GetAtt StepFunctionsLambda.Arn
+      Tracing: Active
+      Environment:
+        Variables:
+          STATE_MACHINE_ARN: !Ref SimulationRunnerStepFunction
+          SCENARIO_DEFINITIONS_FILENAME: !Ref ScenarioDefinitionDocument 
+  SimulationRunnerStepFunction:
+    Type: AWS::StepFunctions::StateMachine
+    DependsOn:
+      - SendSimSummaryFunction
+      - CheckStatusFunction
+      - ProcessAndLaunchBatchSimulationsFunction
+    Properties:
+      DefinitionString: 
+        !Sub |-        
+         {
+            "StartAt": "ProcessAndLaunchBatchSimulations",
+                "States": {
+                  "ProcessAndLaunchBatchSimulations": {
+                    "Type": "Task",
+                    "Resource": "${ProcessAndLaunchBatchSimulationsFunction.Arn}",
+                    "Next": "IsBatchSimRunning",
+                    "Catch": [ {
+                      "ErrorEquals": ["States.ALL"],
+                      "Next": "ErrorLaunchingSimulations",
+                      "ResultPath": "$.error"
+                     } ]
+                  },
+                  "IsBatchSimRunning": {
+                    "Type": "Choice",
+                    "Choices": [
+                      {
+                          "Variable": "$.isDone",
+                          "BooleanEquals": true,
+                          "Next": "SendSimSummary"
+                      }
+                    ],
+                    "Default": "Wait"
+                    },
+                    "Wait": {
+                        "Type": "Wait",
+                        "Seconds": 30,
+                        "Next": "CheckStatus"
+                    },
+                    "CheckStatus": {
+                      "Type": "Task",
+                      "Resource": "${CheckStatusFunction.Arn}",
+                      "InputPath": "$",
+                      "Next": "IsBatchSimRunning",
+                      "Catch": [ {
+                        "ErrorEquals": ["States.ALL"],
+                        "Next": "ErrorLaunchingSimulations",
+                        "ResultPath": "$.error"
+                       } ]
+                    },
+                    "SendSimSummary": {
+                      "Type": "Task",
+                      "InputPath": "$",
+                      "Resource": "${SendSimSummaryFunction.Arn}",
+                      "Catch": [ {
+                        "ErrorEquals": ["States.ALL"],
+                        "Next": "ErrorLaunchingSimulations",
+                        "ResultPath": "$.error"
+                       } ],
+                      "End": true
+                    },
+                    "ErrorLaunchingSimulations": {
+                       "Type": "Task",
+                       "InputPath": "$",
+                       "Resource": "${ErrorLaunchingSimulationsFunction.Arn}",
+                       "ResultPath": "$.error",
+                       "End": true
+                    }
+              }
+          }
+      RoleArn: !GetAtt StepFunctionsLambda.Arn
+      StateMachineName:
+        Fn::Sub: SimulationRunnerStateMachine-${AWS::StackName}
+Outputs:
+  ProcessAndLaunchBatchSimulationsFunction:
+    Description: "Process And Launch Sim Input Function ARN"
+    Value: !GetAtt ProcessAndLaunchBatchSimulationsFunction.Arn
+  CheckStatusFunction:
+    Description: "CheckStatus Function ARN"
+    Value: !GetAtt CheckStatusFunction.Arn
+  SendSimSummaryFunction:
+    Description: "SendSimSummary Function ARN"
+    Value: !GetAtt SendSimSummaryFunction.Arn
