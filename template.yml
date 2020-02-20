@@ -104,48 +104,154 @@ Resources:
     Properties:
       RoleName: !Sub robomaker-simulation-role-batch-${AWS::Region}
       AssumeRolePolicyDocument:
-        Version: 2012-10-17
+        Version: '2012-10-17'
         Statement:
-          -
-            Effect: Allow
+          - Effect: Allow
             Principal:
               Service:
               - robomaker.amazonaws.com
             Action:
             - sts:AssumeRole
-      ManagedPolicyArns:
-        - 'arn:aws:iam::aws:policy/CloudWatchFullAccess'
-        - 'arn:aws:iam::aws:policy/AWSRoboMakerFullAccess'
-        - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
-        - 'arn:aws:iam::aws:policy/AmazonKinesisVideoStreamsFullAccess'
-        - 'arn:aws:iam::aws:policy/AmazonRekognitionFullAccess'
+      Policies:
+      - PolicyName: RoboMakerSimRole
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:      
+            - Effect: Allow
+              Action: s3:ListBucket
+              Resource:
+              - Fn::Join:
+                - /
+                - - Fn::GetAtt:
+                    - S3Bucket
+                    - Arn
+                  - '*'
+            - Effect: Allow
+              Action:
+                - s3:Get*
+                - s3:List*
+              Resource:
+                - Fn::Join:
+                  - /
+                  - - Fn::GetAtt:
+                      - S3Bucket
+                      - Arn
+                    - '*'
+            - Effect: Allow
+              Action: s3:Put*
+              Resource:
+                - Fn::GetAtt:
+                  - S3Bucket
+                  - Arn
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+                - logs:DescribeLogStreams
+              Resource:
+                - '*'
+            - Effect: Allow
+              Action:
+                - ec2:CreateNetworkInterfacePermission
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - ec2:AssociateRouteTable
+                - ec2:CreateSubnet
+                - ec2:DeleteNetworkInterface
+                - ec2:DeleteSubnet
+                - ec2:DescribeNetworkInterfaces
+                - ec2:DescribeSecurityGroups
+                - ec2:DescribeSubnets
+                - ec2:DescribeVpcs
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:DescribeLogStreams
+                - logs:PutLogEvents
+              Resource:
+                - '*'
+            - Effect: Allow
+              Action:
+                - cloudwatch:PutMetricData
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - robomaker:TagResource
+                - robomaker:CancelSimulationJob
+              Resource: '*'
   StepFunctionsLambda:
     Type: 'AWS::IAM::Role'
     Properties:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
-        - Effect: Allow
-          Principal:
-            Service:
-            - lambda.amazonaws.com
-            - states.amazonaws.com
-          Action:
-          - sts:AssumeRole
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+                - states.amazonaws.com
+            Action:
+            - sts:AssumeRole
+      Policies:
+      - PolicyName: StepFunctionsLambdaPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:  
+            - Effect: Allow
+              Action:
+                - lambda:InvokeFunction
+                - codepipeline:PollForJobs
+                - s3:GetAccessPoint
+                - s3:GetObject
+                - cloudwatch:PutMetricData
+                - robomaker:DescribeSimulationJobBatch
+                - robomaker:BatchDescribeSimulationJob
+                - robomaker:DescribeRobotApplication
+                - robomaker:CreateSimulationJob
+                - codepipeline:PutThirdPartyJobFailureResult
+                - logs:CreateLogStream
+                - codepipeline:PutJobFailureResult
+                - s3:HeadBucket
+                - codepipeline:PutThirdPartyJobSuccessResult
+                - s3:PutAccountPublicAccessBlock
+                - s3:ListAccessPoints
+                - codepipeline:PutJobSuccessResult
+                - robomaker:DescribeSimulationApplication
+                - s3:ListJobs
+                - logs:CreateLogGroup
+                - logs:PutLogEvents
+                - robomaker:StartSimulationJobBatch
+                - robomaker:DescribeSimulationJob
+                - robomaker:ListSimulationJobBatches
+                - s3:GetAccountPublicAccessBlock
+                - codepipeline:PutApprovalResult
+                - s3:ListAllMyBuckets
+                - s3:CreateJob
+              Resource: '*'
+            - Effect: Allow
+              Action: 
+              - iam:PassRole
+              - iam:AddRoleToInstanceProfile
+              Resource: !GetAtt RoboMakerSimulationRole.Arn
+            - Effect: Allow
+              Action: states:StartExecution
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - s3:*
+              Resource:
+                - Fn::GetAtt: S3Bucket.Arn
       RoleName: !Sub step-functions-batch-role-${AWS::Region}
-      ManagedPolicyArns:
-        - 'arn:aws:iam::aws:policy/CloudWatchFullAccess'
-        - 'arn:aws:iam::aws:policy/AWSRoboMakerFullAccess'
-        - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
-        - 'arn:aws:iam::aws:policy/AWSLambdaFullAccess'
-        - 'arn:aws:iam::aws:policy/AWSStepFunctionsFullAccess'
-        - 'arn:aws:iam::aws:policy/AWSCodePipelineFullAccess'
   RoboMakerDeploymentRole:
     Type: 'AWS::IAM::Role'
     Properties:
       RoleName: !Sub robomaker-deployment-role-batch-${AWS::Region}
       AssumeRolePolicyDocument:
-        Version: 2012-10-17
+        Version: '2012-10-17'
         Statement:
           -
             Effect: Allow
@@ -158,11 +264,6 @@ Resources:
             - 'sts:AssumeRole'
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/service-role/AWSGreengrassResourceAccessRolePolicy'
-        - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
-        - 'arn:aws:iam::aws:policy/AmazonKinesisVideoStreamsFullAccess'
-        - 'arn:aws:iam::aws:policy/AmazonRekognitionFullAccess'
-        - 'arn:aws:iam::aws:policy/CloudWatchFullAccess'
-        - 'arn:aws:iam::aws:policy/AWSRoboMakerFullAccess'
   DefaultPublicRoute: 
     Type: AWS::EC2::Route
     DependsOn: InternetGatewayAttachment
