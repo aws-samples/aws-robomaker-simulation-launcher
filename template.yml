@@ -418,3 +418,6 @@ Outputs:
   SendSimSummaryFunction:
     Description: "SendSimSummary Function ARN"
     Value: !GetAtt SendSimSummaryFunction.Arn
+  BucketName:
+    Description: "S3 bucket for testing application"
+    Value: !Ref S3Bucket
