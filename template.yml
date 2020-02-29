@@ -207,6 +207,7 @@ Resources:
                 - codepipeline:PollForJobs
                 - s3:GetAccessPoint
                 - s3:GetObject
+                - xray:PutTraceSegments
                 - cloudwatch:PutMetricData
                 - robomaker:DescribeSimulationJobBatch
                 - robomaker:BatchDescribeSimulationJob
@@ -224,6 +225,7 @@ Resources:
                 - s3:ListJobs
                 - logs:CreateLogGroup
                 - logs:PutLogEvents
+                - logs:DescribeLogGroups
                 - robomaker:StartSimulationJobBatch
                 - robomaker:DescribeSimulationJob
                 - robomaker:ListSimulationJobBatches
