@@ -140,9 +140,12 @@ Resources:
             - Effect: Allow
               Action: s3:Put*
               Resource:
-                - Fn::GetAtt:
-                  - S3Bucket
-                  - Arn
+              - Fn::Join:
+                - /
+                - - Fn::GetAtt:
+                    - S3Bucket
+                    - Arn
+                  - '*'
             - Effect: Allow
               Action:
                 - logs:CreateLogGroup
