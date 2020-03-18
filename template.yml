@@ -236,6 +236,7 @@ Resources:
                 - codepipeline:PutApprovalResult
                 - s3:ListAllMyBuckets
                 - s3:CreateJob
+                - iam:CreateServiceLinkedRole
               Resource: '*'
             - Effect: Allow
               Action: 
