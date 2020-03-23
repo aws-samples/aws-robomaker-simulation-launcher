@@ -212,6 +212,7 @@ Resources:
                 - robomaker:BatchDescribeSimulationJob
                 - robomaker:DescribeRobotApplication
                 - robomaker:CreateSimulationJob
+                - xray:PutTraceSegments
                 - codepipeline:PutThirdPartyJobFailureResult
                 - logs:CreateLogStream
                 - codepipeline:PutJobFailureResult
