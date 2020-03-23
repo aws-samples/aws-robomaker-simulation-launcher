@@ -49,20 +49,25 @@ def lambda_handler(event, context):
     for simulation in event['simulations']:
             
         print('Preparing simulation %s...' % json.dumps(simulation))
-        
-        if 'S3_BUCKET' in os.environ and not simulation['params']['outputLocation']['s3Bucket'].strip():
+
+        if 'S3_BUCKET' in os.environ and not simulation.get('params', {}).get('outputLocation', {}).get('s3Bucket', {}):
+            if not "outputLocation" in simulation['params']:
+                simulation['params']['outputLocation'] = {}
             simulation['params']['outputLocation']['s3Bucket'] = os.getenv('S3_BUCKET')
  
-        if 'IAM_ROLE' in os.environ and not simulation['params']['iamRole'].strip():
+        if 'IAM_ROLE' in os.environ and not "iamRole" in simulation['params']:
             simulation['params']['iamRole'] = os.getenv('IAM_ROLE')
                     
-        if simulation['params']['vpcConfig']:
-            if 'SECURITY_GROUP' in os.environ and os.getenv('SECURITY_GROUP') not in simulation['params']['vpcConfig']['securityGroups']:
+        if 'vpcConfig' in simulation['params']:
+            if 'SECURITY_GROUP' in os.environ and os.getenv('SECURITY_GROUP') and "securityGroups" in simulation['params']['vpcConfig']:
                 simulation['params']['vpcConfig']['securityGroups'].append(os.getenv('SECURITY_GROUP'))
+            if not 'subnets' in simulation['params']['vpcConfig']:
+                simulation['params']['vpcConfig']['subnets'] = []
             if 'SUBNET_1' in os.environ and os.getenv('SUBNET_1') not in simulation['params']['vpcConfig']['subnets']:
                 simulation['params']['vpcConfig']['subnets'].append(os.getenv('SUBNET_1'))
             if 'SUBNET_2' in os.environ and os.getenv('SUBNET_2') not in simulation['params']['vpcConfig']['subnets']:
                 simulation['params']['vpcConfig']['subnets'].append(os.getenv('SUBNET_2'))
+
         
         for x, scenario in enumerate(simulation['scenarios']):
             
@@ -77,12 +82,12 @@ def lambda_handler(event, context):
         
                 for y, robotApp in enumerate(_sim_params['robotApplications']):
                     _sim_params['robotApplications'][y]['launchConfig']['environmentVariables'] = event['scenarios'][scenario]['robotEnvironmentVariables']
-                    if 'ROBOT_APP_ARN' in os.environ and not _sim_params['robotApplications'][y]['application'].strip():
+                    if 'ROBOT_APP_ARN' in os.environ and not 'application' in _sim_params['robotApplications'][y]:
                         _sim_params['robotApplications'][y]['application'] = os.getenv('ROBOT_APP_ARN')
                     
                 for z, simApp in enumerate(_sim_params['simulationApplications']):
                     _sim_params['simulationApplications'][z]['launchConfig']['environmentVariables'] = event['scenarios'][scenario]['simEnvironmentVariables']
-                    if 'SIMULATION_APP_ARN' in os.environ and not _sim_params['simulationApplications'][z]['application'].strip():
+                    if 'SIMULATION_APP_ARN' in os.environ and not 'application' in _sim_params['simulationApplications'][z]:
                         _sim_params['simulationApplications'][z]['application'] = os.getenv('SIMULATION_APP_ARN')
                 
                 print('Adding following job: ' + json.dumps(_sim_params))

@@ -140,9 +140,12 @@ Resources:
             - Effect: Allow
               Action: s3:Put*
               Resource:
-                - Fn::GetAtt:
-                  - S3Bucket
-                  - Arn
+              - Fn::Join:
+                - /
+                - - Fn::GetAtt:
+                    - S3Bucket
+                    - Arn
+                  - '*'
             - Effect: Allow
               Action:
                 - logs:CreateLogGroup
@@ -207,6 +210,7 @@ Resources:
                 - codepipeline:PollForJobs
                 - s3:GetAccessPoint
                 - s3:GetObject
+                - xray:PutTraceSegments
                 - cloudwatch:PutMetricData
                 - robomaker:DescribeSimulationJobBatch
                 - robomaker:BatchDescribeSimulationJob
@@ -224,6 +228,7 @@ Resources:
                 - s3:ListJobs
                 - logs:CreateLogGroup
                 - logs:PutLogEvents
+                - logs:DescribeLogGroups
                 - robomaker:StartSimulationJobBatch
                 - robomaker:DescribeSimulationJob
                 - robomaker:ListSimulationJobBatches
@@ -231,6 +236,7 @@ Resources:
                 - codepipeline:PutApprovalResult
                 - s3:ListAllMyBuckets
                 - s3:CreateJob
+                - iam:CreateServiceLinkedRole
               Resource: '*'
             - Effect: Allow
               Action: 
@@ -418,3 +424,6 @@ Outputs:
   SendSimSummaryFunction:
     Description: "SendSimSummary Function ARN"
     Value: !GetAtt SendSimSummaryFunction.Arn
+  BucketName:
+    Description: "S3 bucket for testing application"
+    Value: !Ref S3Bucket
