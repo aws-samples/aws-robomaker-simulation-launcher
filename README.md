@@ -115,7 +115,7 @@ Once ready, run the following commands to build, package and deploy this SAM app
 ```bash
 sam build --use-container -m ./requirements.txt
 sam package --output-template-file package.yml --s3-bucket <YOUR_BUCKET>
-sam deploy --template-file package.yml --stack-name cicd_stack --capabilities CAPABILITY_NAMED_IAM --s3-bucket <YOUR_BUCKET>
+sam deploy --template-file package.yml --stack-name cicd-stack --capabilities CAPABILITY_NAMED_IAM --s3-bucket <YOUR_BUCKET>
 ```
 
 ## Add a resource to your application
@@ -126,7 +126,7 @@ The application template uses AWS Serverless Application Model (AWS SAM) to defi
 To delete the sample application and the bucket that you created, use the AWS CLI.
 
 ```bash
-aws cloudformation delete-stack --stack-name cicd_stack
+aws cloudformation delete-stack --stack-name cicd-stack
 aws s3 rb s3://BUCKET_NAME
 ```
 ## Resources
