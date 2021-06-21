@@ -272,6 +272,7 @@ Resources:
                 - robomaker:StartSimulationJobBatch
                 - robomaker:DescribeSimulationJob
                 - robomaker:ListSimulationJobBatches
+                - robomaker:TagResource
                 - s3:GetAccountPublicAccessBlock
                 - codepipeline:PutApprovalResult
                 - s3:ListAllMyBuckets
