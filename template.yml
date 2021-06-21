@@ -4,6 +4,25 @@ Description: "ROS CICD Pipeline"
 Globals:
   Function:
     Timeout: 3
+Metadata: 
+  AWS::CloudFormation::Interface: 
+    ParameterGroups: 
+      - 
+        Label: 
+          default: "Network Configuration"
+        Parameters: 
+          - VpcCIDR
+          - PublicSubnet1CIDR
+          - PublicSubnet2CIDR
+      - 
+        Label: 
+          default: "RoboMaker Application Configuration"
+        Parameters: 
+          - ROSDistro
+          - GazeboVersion
+          - RobotAppBundleS3KeyName
+          - SimulationAppBundleS3KeyName
+          - ScenarioDefinitionDocument
 Parameters:
     VpcCIDR: 
         Description: Please enter the IP range (CIDR notation) for this VPC
@@ -21,17 +40,39 @@ Parameters:
         Description: Please enter the filename for the scenario definition document used to define scenarios to launch.
         Type: String
         Default: "scenarios.json"
+    ROSDistro:
+        Description: Please enter the ROS disribution to use. 
+        Type: String
+        Default: "Melodic"
+        AllowedValues: 
+          - Melodic
+          - Foxy
+    GazeboVersion:
+        Description: Please enter the ROS disribution to use. 
+        Type: String
+        Default: "9"
+        AllowedValues: 
+          - "9"
+          - "11"
+    RobotAppBundleS3KeyName:
+        Description: Please enter the key name for your robot application bundle in S3
+        Type: String
+        Default: "bundles/x86/robotApp.tar"
+    SimulationAppBundleS3KeyName:
+        Description: Please enter the key name for your simulation application bundle in S3
+        Type: String
+        Default: "bundles/x86/simulationApp.tar"
 Resources:
   RobotApplication:
     Type: "AWS::RoboMaker::RobotApplication"
     Properties:
       Sources:
         - S3Bucket: !Ref S3Bucket
-          S3Key: "bundles/x86/robotApp.tar"
+          S3Key: !Ref RobotAppBundleS3KeyName
           Architecture: "X86_64"
       RobotSoftwareSuite:
         Name: "ROS"
-        Version: "Kinetic"
+        Version: !Ref ROSDistro
       Tags:
         "Name" : "RobotApplication"
         "Type" : "CICD_Auto_Generate"
@@ -40,14 +81,14 @@ Resources:
     Properties:
       Sources:
         - S3Bucket: !Ref S3Bucket
-          S3Key: "bundles/x86/simulationApp.tar"
+          S3Key: !Ref SimulationAppBundleS3KeyName
           Architecture: "X86_64"
       RobotSoftwareSuite:
         Name: "ROS"
-        Version: "Kinetic"
+        Version: !Ref ROSDistro
       SimulationSoftwareSuite:
         Name: "Gazebo"
-        Version: "7"
+        Version: !Ref GazeboVersion
       RenderingEngine:
         Name: "OGRE"
         Version: "1.x"
@@ -102,7 +143,6 @@ Resources:
   RoboMakerSimulationRole:
     Type: 'AWS::IAM::Role'
     Properties:
-      RoleName: !Sub robomaker-simulation-role-batch-${AWS::Region}
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -240,8 +280,8 @@ Resources:
               Resource: '*'
             - Effect: Allow
               Action: 
-              - iam:PassRole
-              - iam:AddRoleToInstanceProfile
+                - iam:PassRole
+                - iam:AddRoleToInstanceProfile
               Resource: !GetAtt RoboMakerSimulationRole.Arn
             - Effect: Allow
               Action: states:StartExecution
@@ -251,25 +291,6 @@ Resources:
                 - s3:*
               Resource:
                 - Fn::GetAtt: S3Bucket.Arn
-      RoleName: !Sub step-functions-batch-role-${AWS::Region}
-  RoboMakerDeploymentRole:
-    Type: 'AWS::IAM::Role'
-    Properties:
-      RoleName: !Sub robomaker-deployment-role-batch-${AWS::Region}
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          -
-            Effect: Allow
-            Principal:
-              Service:
-                - lambda.amazonaws.com
-                - iot.amazonaws.com
-                - greengrass.amazonaws.com
-            Action:
-            - 'sts:AssumeRole'
-      ManagedPolicyArns:
-        - 'arn:aws:iam::aws:policy/service-role/AWSGreengrassResourceAccessRolePolicy'
   DefaultPublicRoute: 
     Type: AWS::EC2::Route
     DependsOn: InternetGatewayAttachment
